@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fun with shapes!</title>
+    <style type="text/css">
+    * {box-sizing:border-box;}
+    html {margin:0; padding:0; height:100%; min-height:100%;}
+    body {margin:0; padding:0; height:100%; min-height:100%; background: linear-gradient(to bottom, rgb(11,127,156), rgb(0,28,54));}
+    canvas {position:absolute; top:0; width:100vw; height:100vh; left:0; z-index:1}
+    </style>
+</head>
+
+<body>
+
+<canvas id="fffuuu" class=""></canvas>
+
+<script type="text/javascript">
+
+Number.prototype.squared = function() {
+    return this * this;
+}
+
+var PI180 = Math.PI / 180;
+
+var util = {
+    // Nice helper function to generate a random number
+    // from @min to @max and optional @step val
+    random: function(min, max, step) {
+        step = step || 1;
+        return (Math.round(Math.random() * ((max - min)/step)) * step) + min;
+    },
+
+    // Exponentially-weighted random number generator
+    exprandom: function(min, max, step) {
+        var r = Math.log(1 - Math.random()) / -3;
+        return (Math.round(r * ((max - min) / step)) * step) + min;
+    },
+
+
+    // Calculate the determinant of a 3x3 maxtrix
+    determinant3x3: function(m) {
+        return ((m[0][0] * m[1][1] * m[2][2]) +
+                (m[0][1] * m[1][2] * m[2][0]) +
+                (m[0][2] * m[1][0] * m[2][1]) -
+                (m[0][2] * m[1][1] * m[2][0]) -
+                (m[0][1] * m[1][0] * m[2][2]) -
+                (m[0][0] * m[1][2] * m[2][1]));
+    }
+};
+
+
+(function(w, e, c) {
+    var pts = [],
+        numPts = 80,
+        rootSpeed = 2,
+        // $stat = document.getElementById('stat');
+        __w = parseInt(w.getComputedStyle(e).width) * (w.devicePixelRatio || 1),
+        __h = parseInt(w.getComputedStyle(e).height)* (w.devicePixelRatio || 1),
+        distanceThreshold = __w / 8,
+
+    init = function() {
+        var i = 0;
+        c.globalCompositeOperation = 'destination-out';
+
+        for (i; i < numPts; i++) {
+            pts.push(newPt());
+        }
+
+        // We need a width and height for the canvas in order
+        // to know where to draw things.
+        e.width = __w;
+        e.height = __h;
+    },
+
+    newPt = function() {
+        return {
+            x: util.random(0, __w, 10),
+            y: util.random(0, __h, 10),
+            speedX: util.random(1, rootSpeed, .1),
+            speedY: util.random(1, rootSpeed, .1),
+            size: 2,
+            resetPt: function() {
+                this.x = util.random(0, __w, 10);
+                this.y = util.random(0, __h, 10);
+            },
+            move: function() {
+                this.x += (this.speedX * Math.cos(PI180 * this.y));
+                this.y += (this.speedY * Math.cos(PI180 * this.x));
+
+                if ((this.x > __w) ||
+                    (this.x < this.size)) {
+                    this.speedX *= -1;
+                    // this.resetPt();
+                }
+                if ((this.y > __h) ||
+                    (this.y < this.size)) {
+                    this.speedY *= -1;
+                    // this.resetPt();
+                }
+
+                this.draw();
+            },
+            draw: function() {
+                drawDot(this);
+            }
+        };
+    },
+
+    sortPoints = function(T) {
+        var calculateTriangleCenter = function(T) {
+            return {
+                x: (T.A.x + T.B.x + T.C.x) / 3,
+                y: (T.A.y + T.B.y + T.C.y) / 3 };
+        },
+
+        C = calculateTriangleCenter(T);
+        arr = [T.A, T.B, T.C];
+
+        arr = arr.sort(function(a, b) {
+            return ((a.x - C.x) * (b.y - C.y)) - ((b.x - C.x) * (a.y - C.y)) > 0;
+        });
+
+        // drawDot(C, 'rgb(128,0,0)');
+
+        return {A:arr[0], B:arr[1], C:arr[2]};
+    },
+
+    calcDistance = function(pt1, pt2) {
+        return Math.sqrt((pt2.x - pt1.x).squared() + (pt2.y - pt1.y).squared());
+    },
+
+    drawDot = function(pt, color) {
+        color = color || 'rgba(255,255,255,1)';
+
+        c.save();
+        c.translate(Math.round(pt.x), Math.round(pt.y));
+        c.fillStyle = color;
+        c.beginPath();
+        c.arc(0, 0, pt.size || 2, Math.PI * 2, 0, true);
+        c.closePath();
+        c.fill();
+        c.restore();
+    },
+
+    drawLine = function(pt1, pt2) {
+        var o = (distanceThreshold - calcDistance(pt1, pt2)) / distanceThreshold;
+        if (o > 0) {
+            // c.save();
+            c.beginPath();
+            c.moveTo(pt1.x, pt1.y);
+            c.lineTo(pt2.x, pt2.y);
+            // c.quadraticCurveTo(pt1.x + 10, pt1.y + 10, pt2.x, pt2.y);
+            c.strokeStyle = 'rgba(112, 226, 255, ' + o + ')';
+            c.stroke();
+            // c.closePath();
+            // c.restore();
+        }
+    },
+
+    drawTriangle = function(T) {
+        drawLine(T.A, T.B);
+        drawLine(T.B, T.C);
+        drawLine(T.C, T.A);
+    },
+
+    drawCircumcircle = function(T) {
+        var mA = [[T.A.x, T.A.y, 1], [T.B.x, T.B.y, 1], [T.C.x, T.C.y, 1]],
+            mBx= [[(T.A.x.squared() + T.A.y.squared()), T.A.y, 1], [(T.B.x.squared() + T.B.y.squared()), T.B.y, 1], [(T.C.x.squared() + T.C.y.squared()), T.C.y, 1]],
+            mBy= [[(T.A.x.squared() + T.A.y.squared()), T.A.x, 1], [(T.B.x.squared() + T.B.y.squared()), T.B.x, 1], [(T.C.x.squared() + T.C.y.squared()), T.C.x, 1]],
+            mC = [[(T.A.x.squared() + T.A.y.squared()), T.A.x, T.A.y], [(T.B.x.squared() + T.B.y.squared()), T.B.x, T.B.y], [(T.C.x.squared() + T.C.y.squared()), T.C.x, T.C.y]],
+            dmBx = util.determinant3x3(mBx) * -1,
+            dmBy = util.determinant3x3(mBy),
+            dmA  = util.determinant3x3(mA),
+            dmC  = util.determinant3x3(mC) * -1,
+            cx = dmBx / (-2 * dmA),
+            cy = dmBy / (-2 * dmA),
+            r = Math.sqrt(dmBx.squared() + dmBy.squared() - (4 * dmA * dmC)) / (2 * Math.abs(dmA)),
+            o = 1 - (r / (__w * .5));
+
+        c.save();
+        c.strokeStyle = 'rgba(128,128,128,' + o + ')';
+        c.fillStyle = 'rgba(128,33,0,' + o + ')';
+        c.lineWidth = 3;
+        c.beginPath();
+        c.arc(cx,cy,r, 0,Math.PI * 2);
+        c.closePath();
+        c.stroke();
+        c.restore();
+    },
+
+    isPointInCircumcircle = function(p, T) {
+        var D = [
+            [(T.A.x - p.x), (T.A.y - p.y), (T.A.x.squared() - p.x.squared()) + (T.A.y.squared() - p.y.squared())],
+            [(T.B.x - p.x), (T.B.y - p.y), (T.B.x.squared() - p.x.squared()) + (T.B.y.squared() - p.y.squared())],
+            [(T.C.x - p.x), (T.C.y - p.y), (T.C.x.squared() - p.x.squared()) + (T.C.y.squared() - p.y.squared())]
+        ];
+
+        return util.determinant3x3(D) < 0;
+    },
+
+    oldttr = 0,
+
+    animate = function() {
+        var i = 0, j = 0;
+            // tempT = [],
+            // linesDrawn = 0,
+            // ttr = performance.now(); //new Date();
+        c.clearRect(0,0, __w, __h);
+
+        for (i; i < pts.length; i++) {
+            pts[i].move();
+
+            for (j = 0; j < pts.length; j++) {
+                if (i !== j) {
+                    // c.beginPath();
+                    // c.strokeStyle = 'rgba(128,128,128,0.25)';
+                    drawLine(pts[i], pts[j]);
+                    // c.stroke();
+                    // c.closePath();
+                }
+            }
+        }
+
+        // FIX MEEEEEEE
+        // for (var i = 0; i < pts.length - 2; i++) {
+        //     for (var j = i; j < pts.length - 1; j++) {
+        //         for (var k = j; k < pts.length; k++) {
+        //             if ((i !== j) && (j !== k) && (i !== k)) {
+        //                 tempT.push(sortPoints({A: pts[i], B: pts[j], C:pts[k]}));
+        //             }
+        //         }
+        //     }
+        // }
+
+        // for (i = 0; i < tempT.length; i++) {
+        //     drawTriangle(tempT[i]);
+        // }
+
+        // for (i = 0; i < tempT.length; i++) {
+        //     var pointsInside = 0;
+        //     for (var j = 0; j < pts.length; j++) {
+        //         if (isPointInCircumcircle(pts[j], tempT[i])) {
+        //             pointsInside++;
+        //         }
+        //     }
+
+        //     if (pointsInside == 0) {
+        //         drawTriangle(tempT[i]);
+        //         // drawCircumcircle(tempT[i]);
+        //     }
+        // }
+
+        // ttr = ((performance.now()) - ttr);
+        // $stat.innerHTML = ~~ttr;
+        w.requestAnimationFrame(animate);
+    };
+
+    init();
+    w.requestAnimationFrame(animate);
+
+})(window, document.getElementById('fffuuu'), document.getElementById('fffuuu').getContext('2d'));
+
+
+</script>
+</body>
+</html>
